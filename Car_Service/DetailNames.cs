@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-
-//У вас есть автосервис, в который приезжают люди, чтобы починить свои автомобили.
+﻿//У вас есть автосервис, в который приезжают люди, чтобы починить свои автомобили.
 //У вашего автосервиса есть баланс денег и склад деталей.
 //Когда приезжает автомобиль, у него сразу ясна его поломка,
 //и эта поломка отображается у вас в консоли вместе с ценой за починку(цена за починку складывается из цены детали + цена за работу).
@@ -14,53 +10,22 @@ using System.Linq;
 //Деталь всего одна, за количество отвечает тот, кто хранит детали.
 //При необходимости можно создать дополнительный класс для конкретной детали и работе с количеством.
 
+using System.Collections.Generic;
+
 namespace Car_Service
 {
-    class CarFabrik
+    class DetailNames
     {
-        private DetailFabrik _detailFabrik = new DetailFabrik(new DetailNames());
+        public DetailNames() =>
+            NamesQuantity = 3;
 
-        public List<Detail> CarDetails => new List<Detail> { _detailFabrik.CreatePendant(), _detailFabrik.CreateEngine(), _detailFabrik.CreateBrakeSystem() };
+        public int NamesQuantity { get; private set; }
 
-        public Car CreateCar()
-        {
-            List<Detail> CarDetails = this.CarDetails;
+        public string Engine => "Двигатель";
+        public string BrakeSystem => "Тормозная система";
+        public string Pendant => "Подвеска";
 
-            BreakCarDetails(CarDetails);
-
-            return new Car(CarDetails);
-        }
-
-        private void BreakCarDetails(List<Detail> details)
-        {
-            int breakQuantity = RandomUtility.Next(details.Count);
-
-            if (breakQuantity == 0)
-            {
-                int detailIndex = RandomUtility.Next(details.Count);
-
-                details[detailIndex].SetIsWorkingFalse();
-
-                return;
-            }
-
-            BreakRandomDetails(details, breakQuantity);
-        }
-
-        private void BreakRandomDetails(List<Detail> details, int quantity)
-        {
-            List<Detail> tempDetails = new List<Detail>(details);
-
-            for (int i = 0; i < quantity; i++)
-            {
-                int detailIndex = RandomUtility.Next(tempDetails.Count);
-
-                Detail detail = tempDetails[detailIndex];
-
-                detail.SetIsWorkingFalse();
-
-                tempDetails.Remove(detail);
-            }
-        }
+        public List<string> GiveAllNames() =>
+            new List<string> { Engine, BrakeSystem, Pendant };
     }
 }

@@ -19,7 +19,10 @@ namespace Car_Service
     {
         private static Random s_random = new Random();
 
-        public static int Next(int value) =>
-            s_random.Next(value);
+        public static int Next(int maxValue) =>
+            s_random.Next(maxValue);
+
+        public static int Next(int minValue, int maxValue) =>
+            s_random.Next(minValue, maxValue);
     }
 }

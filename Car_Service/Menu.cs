@@ -38,8 +38,11 @@ namespace Car_Service
             }
         }
 
-        protected virtual void ConfirmActionSelection() =>
-            Console.Clear();
+        protected virtual void ConfirmActionSelection()
+        {
+            Renderer.EraseColumnText(_items.Length);
+            Renderer.EraseText();
+        }
 
         protected void Exit() =>
             _isRunning = false;

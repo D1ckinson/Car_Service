@@ -19,47 +19,20 @@ namespace Car_Service
 {
     class DetailFabrik
     {
-        private Dictionary<Type, Func<string, Detail>> _detailByType;
-        private Dictionary<Type, string> _detailNameByType;
+        private DetailNames _detailNames;
 
-        public DetailFabrik()
-        {
-            _detailByType = new Dictionary<Type, Func<string, Detail>>
-            {
-                { EngineType, CreateEngine },
-                { BrakeSystemType, CreateBrakeSystem },
-                { PendantType, CreatePendant }
-            };
+        public DetailFabrik(DetailNames detailNames) =>
+            _detailNames = detailNames;
 
-            _detailNameByType = new Dictionary<Type, string>
-            {
-                { EngineType, "Двигатель" },
-                { BrakeSystemType, "Тормозная система" },
-                { PendantType, "Подвеска" }
-            };
-        }
+        public int Price => 1000;
 
-        public Type EngineType => typeof(Engine);
-        public Type BrakeSystemType => typeof(BrakeSystem);
-        public Type PendantType => typeof(Pendant);
+        public Engine CreateEngine() =>
+            new Engine(_detailNames.Engine);
 
-        public string EngineName => "Двигатель";
-        public string BrakeSystemName => "Тормозная система";
-        public string PendantName => "Подвеска";
+        public BrakeSystem CreateBrakeSystem() =>
+            new BrakeSystem(_detailNames.BrakeSystem);
 
-        public Detail CreateDetailByType(Type detailType) =>
-            _detailByType[detailType].Invoke(_detailNameByType[detailType]);
-
-        public string GiveDetailNameByType(Type detailType) =>
-            _detailNameByType[detailType];
-
-        private Engine CreateEngine(string name) =>
-            new Engine(name);
-
-        private BrakeSystem CreateBrakeSystem(string name) =>
-            new BrakeSystem(name);
-
-        private Pendant CreatePendant(string name) =>
-            new Pendant(name);
+        public Pendant CreatePendant() =>
+            new Pendant(_detailNames.Pendant);
     }
 }

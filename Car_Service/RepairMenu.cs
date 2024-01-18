@@ -18,17 +18,21 @@ namespace Car_Service
 {
     class RepairMenu : Menu
     {
-        private string _exitWord = "Назад";
-        private Action<Type> _action;
-        private Dictionary<string, Type> _repairOptions;
+        private string _exitWord = "Закончить ремонт";
+        private Action<string> _action;
+        private Action _updateInfo;
+        private Dictionary<string, string> _repairOptions;
 
-        public RepairMenu(Dictionary<string, Type> repairOptions, Action<Type> action)
+        public RepairMenu(Dictionary<string, string> repairOptions, Action<string> action, Action updateInfo)
         {
             _action = action;
             _repairOptions = repairOptions;
+            _updateInfo = updateInfo;
 
             _repairOptions.Add(_exitWord, null);
             _items = _repairOptions.Keys.ToArray();
+
+            _updateInfo.Invoke();
         }
 
         protected override void ConfirmActionSelection()
@@ -42,7 +46,11 @@ namespace Car_Service
                 return;
             }
 
-            _action(_repairOptions[_items[_itemIndex]]);
-        }
+            string detailName = _repairOptions[_items[_itemIndex]];
+
+            _action(detailName);
+
+            _updateInfo.Invoke();
+        }        
     }
 }

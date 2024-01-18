@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-
-//У вас есть автосервис, в который приезжают люди, чтобы починить свои автомобили.
+﻿//У вас есть автосервис, в который приезжают люди, чтобы починить свои автомобили.
 //У вашего автосервиса есть баланс денег и склад деталей.
 //Когда приезжает автомобиль, у него сразу ясна его поломка,
 //и эта поломка отображается у вас в консоли вместе с ценой за починку(цена за починку складывается из цены детали + цена за работу).
@@ -14,53 +10,37 @@ using System.Linq;
 //Деталь всего одна, за количество отвечает тот, кто хранит детали.
 //При необходимости можно создать дополнительный класс для конкретной детали и работе с количеством.
 
+using System.Collections.Generic;
+using System;
+using System.Linq;
+
 namespace Car_Service
 {
-    class CarFabrik
+    class BuyMenu : Menu
     {
-        private DetailFabrik _detailFabrik = new DetailFabrik(new DetailNames());
+        private Dictionary<string, Func<Detail>> _actions;
+        private Action<Func<Detail>> _action;
 
-        public List<Detail> CarDetails => new List<Detail> { _detailFabrik.CreatePendant(), _detailFabrik.CreateEngine(), _detailFabrik.CreateBrakeSystem() };
-
-        public Car CreateCar()
+        public BuyMenu(Dictionary<string, Func<Detail>> actions, Action<Func<Detail>> action)
         {
-            List<Detail> CarDetails = this.CarDetails;
-
-            BreakCarDetails(CarDetails);
-
-            return new Car(CarDetails);
+            _actions = actions;
+            _actions.Add("Закончить покупки", Exit);
+            _items = _actions.Keys.ToArray();
+            _action = action;
         }
 
-        private void BreakCarDetails(List<Detail> details)
+        protected override void ConfirmActionSelection()
         {
-            int breakQuantity = RandomUtility.Next(details.Count);
+            base.ConfirmActionSelection();
 
-            if (breakQuantity == 0)
-            {
-                int detailIndex = RandomUtility.Next(details.Count);
-
-                details[detailIndex].SetIsWorkingFalse();
-
-                return;
-            }
-
-            BreakRandomDetails(details, breakQuantity);
+            _action(_actions[_items[_itemIndex]]);
         }
 
-        private void BreakRandomDetails(List<Detail> details, int quantity)
+        private new Detail Exit()
         {
-            List<Detail> tempDetails = new List<Detail>(details);
+            base.Exit();
 
-            for (int i = 0; i < quantity; i++)
-            {
-                int detailIndex = RandomUtility.Next(tempDetails.Count);
-
-                Detail detail = tempDetails[detailIndex];
-
-                detail.SetIsWorkingFalse();
-
-                tempDetails.Remove(detail);
-            }
+            return null;
         }
     }
 }

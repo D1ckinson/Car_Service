@@ -17,22 +17,28 @@ namespace Car_Service
 {
     class Car
     {
-        private Dictionary<Type, Detail> _details = new Dictionary<Type, Detail>();
+        private List<Detail> _details;
 
-        public Car(Dictionary<Type, Detail> details) =>
+        public Car(List<Detail> details) =>
             _details = details;
 
-        public Dictionary<string, bool> GiveDetailsStatus()
+        public List<string> GiveDetailsForRepair()
         {
-            Dictionary<string, bool> detailsStatus = new Dictionary<string, bool>();
+            List<string> detailsNames = new List<string>();
 
-            foreach (Detail detail in _details.Values)
-                detailsStatus.Add(detail.Name, detail.IsWorking);
+            foreach (Detail detail in _details)
+                if (detail.IsWorking == false)
+                    detailsNames.Add(detail.Name);
 
-            return detailsStatus;
+            return detailsNames;
         }
 
-        public void InstallDetail(Detail detail) =>
-            _details[detail.GetType()] = detail;
+        public void InstallDetail(Detail detail)
+        {
+            Detail replacementDetail = _details.Find(desiredDetail => desiredDetail.Name == detail.Name);
+
+            _details.Remove(replacementDetail);
+            _details.Add(detail);
+        }
     }
 }

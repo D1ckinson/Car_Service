@@ -20,26 +20,83 @@ namespace Car_Service
     {
         private List<Detail> _storage = new List<Detail>();
         private int _money = 10000;
+        private int _moneyForRepair = 1500;
+        private int _moneyForFailure = 2000;
         private Car _car;
+        private DetailNames _detailNames;
+
+        public CarService(DetailNames detailNames)
+        {
+            _detailNames = detailNames;
+            _storage.Add(new BrakeSystem(_detailNames.BrakeSystem));
+            _storage.Add(new Engine(_detailNames.Engine));
+            _storage.Add(new Pendant(_detailNames.Pendant));
+        }
+
+        public bool IsMoneyEnough(int price) =>
+            _money > price;
+
+        public string[] GetStorageInfo()
+        {
+            int uniqueDetailsQuantity = _detailNames.NamesQuantity;
+            string[] info = new string[uniqueDetailsQuantity + 1];
+            List<string> allDetailsNames = _detailNames.GiveAllNames();
+
+            info[0] = $"Ваш капитал = {_money}.";
+            info[1] = "Количество деталей на складе:";
+
+            for (int i = 1; i < uniqueDetailsQuantity + 1; i++)
+            {
+                string detailName = allDetailsNames[i - 1];
+                int detailsQuantity = _storage.Count(detail => detail.Name == detailName);
+
+                info[i] = $"{detailName} {detailsQuantity}";
+            }
+
+            return info;
+        }
 
         public void TakeCar(Car car) =>
             _car = car;
 
-        public Dictionary<string, bool> GiveCarDetailStatus() =>
-            _car.GiveDetailsStatus();
+        public void TakeDetail(Detail detail) =>
+            _storage.Add(detail);
 
-        public void ReplaceDetail(Type type)
+        public void PayMoney(int price) =>
+            _money -= price;
+
+        public List<string> GiveDetailsForRepair() =>
+            _car.GiveDetailsForRepair();
+
+        public void ReplaceDetail(string detailName)
         {
-            Detail detail = _storage.FirstOrDefault(detailToFind => detailToFind.GetType() == type);
+            Detail detail = _storage.FirstOrDefault(detailToFind => detailToFind.Name == detailName);
 
             if (detail == null)
             {
-                Renderer.DrawText($"{detail.Name} нет на складе.",Renderer.ResponseCursorPositionY);
+                Renderer.DrawText($"{detailName} нет на складе.");
+
+                return;
+            }
+
+            if (_car.GiveDetailsForRepair().FirstOrDefault(detailsName => detail.Name == detailsName) == null)
+            {
+                Renderer.DrawText("Вы заменили не ту деталь и вас оштрафовали.");
+
+                _money -= _moneyForFailure;
+
+                if (_money < 0)
+                    _money = 0;
 
                 return;
             }
 
             _car.InstallDetail(detail);
+            _storage.Remove(detail);
+
+            Renderer.DrawText($"Вы заменили {detailName}.");
+
+            _money += _moneyForRepair;
         }
     }
 }

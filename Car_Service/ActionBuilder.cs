@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Reflection.Emit;
 
 //У вас есть автосервис, в который приезжают люди, чтобы починить свои автомобили.
 //У вашего автосервиса есть баланс денег и склад деталей.
@@ -18,42 +20,80 @@ namespace Car_Service
     class ActionBuilder
     {
         private CarService _carService;
-        private DetailFabrik _detailFabrik;
+        private DetailFabrik _detailFabrik = new DetailFabrik(new DetailNames());
         private CarFabrik _carFabrik = new CarFabrik();
+        private DetailNames _detailNames = new DetailNames();
 
-        public ActionBuilder(CarService carService, DetailFabrik detailFabrik)
-        {
+        public ActionBuilder(CarService carService) =>
             _carService = carService;
-            _detailFabrik = detailFabrik;
-        }
 
-        public Dictionary<string, Action> GiveMenuActions() =>
+        public Dictionary<string, Action> MainMenuActions =>
             new Dictionary<string, Action>
             {
                 {"Отремонтировать машину", RepairCar },
                 {"Купить детали", BuyDetails }
             };
 
+        private Dictionary<string, Func<Detail>> BuyMenuActions =>
+            new Dictionary<string, Func<Detail>>
+            {
+                {$"Купить {_detailNames.Engine}", _detailFabrik.CreateEngine},
+                {$"Купить {_detailNames.Pendant}", _detailFabrik.CreatePendant},
+                {$"Купить {_detailNames.BrakeSystem}", _detailFabrik.CreateBrakeSystem},
+            };
+
         private void RepairCar()
         {
             _carService.TakeCar(_carFabrik.CreateCar());
 
-            Menu repairMenu = new RepairMenu(CreateRepairMenuOptions(), _carService.ReplaceDetail);
+            Menu repairMenu = new RepairMenu(CreateRepairMenuOptions(), _carService.ReplaceDetail, UpdateRepairInfo);
 
             repairMenu.Work();
+
+            Renderer.EraseColumnText(_detailNames.NamesQuantity + 1, Renderer.DetailsForRepairCursorPositionY);
+        }
+
+        private void UpdateRepairInfo()
+        {
+            Renderer.EraseColumnText(_detailNames.NamesQuantity + 1, Renderer.DetailsForRepairCursorPositionY);
+            Renderer.DrawRepairInfo(_carService.GiveDetailsForRepair());
+            Renderer.DrawStorage(_carService.GetStorageInfo());
         }
 
         private void BuyDetails()
         {
+            BuyMenu buyMenu = new BuyMenu(BuyMenuActions, BuyDetail);
 
+            buyMenu.Work();
         }
 
-        private Dictionary<string, Type> CreateRepairMenuOptions()
+        private void BuyDetail(Func<Detail> GiveDetail)
         {
-            Dictionary<string, Type> repairMenuOptions = new Dictionary<string, Type>();
+            if (GiveDetail.Invoke() == null)
+                return;
 
-            _carFabrik.CarDetailsTypes.
-                ForEach(detailType => repairMenuOptions.Add($"Заменить {_detailFabrik.GiveDetailNameByType(detailType)}.", detailType));
+            if (_carService.IsMoneyEnough(_detailFabrik.Price))
+            {
+                Detail detail = GiveDetail.Invoke();
+
+                _carService.TakeDetail(detail);
+                _carService.PayMoney(_detailFabrik.Price);
+
+                Renderer.DrawText($"Вы купили {detail.Name}.");
+                Renderer.DrawStorage(_carService.GetStorageInfo());
+            }
+            else
+            {
+                Renderer.DrawText("У вас недостаточно денег.");
+            }
+        }
+
+        private Dictionary<string, string> CreateRepairMenuOptions()
+        {
+            Dictionary<string, string> repairMenuOptions = new Dictionary<string, string>();
+
+            _carFabrik.CarDetails.
+                ForEach(detail => repairMenuOptions.Add($"Заменить {detail.Name}.", detail.Name));
 
             return repairMenuOptions;
         }

@@ -44,10 +44,12 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="ActionBuilder.cs" />
+    <Compile Include="BuyMenu.cs" />
     <Compile Include="Car.cs" />
     <Compile Include="CarFabrik.cs" />
     <Compile Include="CarService.cs" />
     <Compile Include="DetailFabrik.cs" />
+    <Compile Include="DetailNames.cs" />
     <Compile Include="MainMenu.cs" />
     <Compile Include="Menu.cs" />
     <Compile Include="Program.cs" />

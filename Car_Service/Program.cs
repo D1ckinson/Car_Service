@@ -24,10 +24,12 @@ namespace Car_Service
         {
             Console.CursorVisible = false;
 
-            CarService carService = new CarService();
-            DetailFabrik detailFabrik = new DetailFabrik();
-            ActionBuilder actionBuilder = new ActionBuilder(carService, detailFabrik);
-            Menu menu = new MainMenu(actionBuilder.GiveMenuActions());
+            DetailNames detailNames = new DetailNames();
+            CarService carService = new CarService(detailNames);
+            ActionBuilder actionBuilder = new ActionBuilder(carService);
+            Menu menu = new MainMenu(actionBuilder.MainMenuActions);
+
+            Renderer.DrawStorage(carService.GetStorageInfo());
 
             menu.Work();
         }
