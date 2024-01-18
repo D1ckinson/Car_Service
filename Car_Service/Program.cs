@@ -1,20 +1,7 @@
 ﻿using System;
-using System.Reflection;
-using System.Text;
-using System.Threading.Tasks;
-using static System.Collections.Specialized.BitVector32;
+using System.Collections.Generic;
+using System.Linq;
 
-//У вас есть автосервис, в который приезжают люди, чтобы починить свои автомобили.
-//У вашего автосервиса есть баланс денег и склад деталей.
-//Когда приезжает автомобиль, у него сразу ясна его поломка,
-//и эта поломка отображается у вас в консоли вместе с ценой за починку(цена за починку складывается из цены детали + цена за работу).
-//Поломка всегда чинится заменой детали, но количество деталей ограничено тем, что находится на вашем складе деталей.
-//Если у вас нет нужной детали на складе, то вы можете отказать клиенту, и в этом случае вам придется выплатить штраф.
-//Если вы замените не ту деталь, то вам придется возместить ущерб клиенту.
-//За каждую удачную починку вы получаете выплату за ремонт, которая указана в чек-листе починки.
-//Класс Деталь не может содержать значение “количество”.
-//Деталь всего одна, за количество отвечает тот, кто хранит детали.
-//При необходимости можно создать дополнительный класс для конкретной детали и работе с количеством.
 
 namespace Car_Service
 {
@@ -63,5 +50,510 @@ namespace Car_Service
     class BrakeSystem : Detail
     {
         public BrakeSystem(string name) : base(name) { }
+    }
+
+    class ActionBuilder
+    {
+        private CarService _carService;
+        private DetailFabrik _detailFabrik = new DetailFabrik(new DetailNames());
+        private CarFabrik _carFabrik = new CarFabrik();
+        private DetailNames _detailNames = new DetailNames();
+
+        public ActionBuilder(CarService carService) =>
+            _carService = carService;
+
+        public Dictionary<string, Action> MainMenuActions =>
+            new Dictionary<string, Action>
+            {
+                {"Отремонтировать машину", RepairCar },
+                {"Купить детали", BuyDetails }
+            };
+
+        private Dictionary<string, Func<Detail>> BuyMenuActions =>
+            new Dictionary<string, Func<Detail>>
+            {
+                {$"Купить {_detailNames.Engine}", _detailFabrik.CreateEngine},
+                {$"Купить {_detailNames.Pendant}", _detailFabrik.CreatePendant},
+                {$"Купить {_detailNames.BrakeSystem}", _detailFabrik.CreateBrakeSystem},
+            };
+
+        private void RepairCar()
+        {
+            _carService.TakeCar(_carFabrik.CreateCar());
+
+            Menu repairMenu = new RepairMenu(CreateRepairMenuOptions(), _carService.ReplaceDetail, UpdateRepairInfo);
+
+            repairMenu.Work();
+
+            Renderer.EraseColumnText(_detailNames.NamesQuantity + 1, Renderer.DetailsForRepairCursorPositionY);
+        }
+
+        private void UpdateRepairInfo()
+        {
+            Renderer.EraseColumnText(_detailNames.NamesQuantity + 1, Renderer.DetailsForRepairCursorPositionY);
+            Renderer.DrawRepairInfo(_carService.GiveDetailsForRepair());
+            Renderer.DrawStorage(_carService.GetStorageInfo());
+        }
+
+        private void BuyDetails()
+        {
+            BuyMenu buyMenu = new BuyMenu(BuyMenuActions, BuyDetail);
+
+            buyMenu.Work();
+        }
+
+        private void BuyDetail(Func<Detail> GiveDetail)
+        {
+            if (GiveDetail.Invoke() == null)
+                return;
+
+            if (_carService.IsMoneyEnough(_detailFabrik.Price))
+            {
+                Detail detail = GiveDetail.Invoke();
+
+                _carService.TakeDetail(detail);
+                _carService.PayMoney(_detailFabrik.Price);
+
+                Renderer.DrawText($"Вы купили {detail.Name}.");
+                Renderer.DrawStorage(_carService.GetStorageInfo());
+            }
+            else
+            {
+                Renderer.DrawText("У вас недостаточно денег.");
+            }
+        }
+
+        private Dictionary<string, string> CreateRepairMenuOptions()
+        {
+            Dictionary<string, string> repairMenuOptions = new Dictionary<string, string>();
+
+            _carFabrik.CarDetails.
+                ForEach(detail => repairMenuOptions.Add($"Заменить {detail.Name}.", detail.Name));
+
+            return repairMenuOptions;
+        }
+    }
+
+    class Car
+    {
+        private List<Detail> _details;
+
+        public Car(List<Detail> details) =>
+            _details = details;
+
+        public List<string> GiveDetailsForRepair()
+        {
+            List<string> detailsNames = new List<string>();
+
+            foreach (Detail detail in _details)
+                if (detail.IsWorking == false)
+                    detailsNames.Add(detail.Name);
+
+            return detailsNames;
+        }
+
+        public void InstallDetail(Detail detail)
+        {
+            Detail replacementDetail = _details.Find(desiredDetail => desiredDetail.Name == detail.Name);
+
+            _details.Remove(replacementDetail);
+            _details.Add(detail);
+        }
+    }
+
+    class CarFabrik
+    {
+        private DetailFabrik _detailFabrik = new DetailFabrik(new DetailNames());
+
+        public List<Detail> CarDetails => new List<Detail> { _detailFabrik.CreatePendant(), _detailFabrik.CreateEngine(), _detailFabrik.CreateBrakeSystem() };
+
+        public Car CreateCar()
+        {
+            List<Detail> CarDetails = this.CarDetails;
+
+            BreakCarDetails(CarDetails);
+
+            return new Car(CarDetails);
+        }
+
+        private void BreakCarDetails(List<Detail> details)
+        {
+            int breakQuantity = RandomUtility.Next(details.Count);
+
+            if (breakQuantity == 0)
+            {
+                int detailIndex = RandomUtility.Next(details.Count);
+
+                details[detailIndex].SetIsWorkingFalse();
+
+                return;
+            }
+
+            BreakRandomDetails(details, breakQuantity);
+        }
+
+        private void BreakRandomDetails(List<Detail> details, int quantity)
+        {
+            List<Detail> tempDetails = new List<Detail>(details);
+
+            for (int i = 0; i < quantity; i++)
+            {
+                int detailIndex = RandomUtility.Next(tempDetails.Count);
+
+                Detail detail = tempDetails[detailIndex];
+
+                detail.SetIsWorkingFalse();
+
+                tempDetails.Remove(detail);
+            }
+        }
+    }
+
+    class CarService
+    {
+        private List<Detail> _storage = new List<Detail>();
+        private int _money = 10000;
+        private int _moneyForRepair = 1500;
+        private int _moneyForFailure = 2000;
+        private Car _car;
+        private DetailNames _detailNames;
+
+        public CarService(DetailNames detailNames)
+        {
+            _detailNames = detailNames;
+            _storage.Add(new BrakeSystem(_detailNames.BrakeSystem));
+            _storage.Add(new Engine(_detailNames.Engine));
+            _storage.Add(new Pendant(_detailNames.Pendant));
+        }
+
+        public bool IsMoneyEnough(int price) =>
+            _money > price;
+
+        public string[] GetStorageInfo()
+        {
+            int uniqueDetailsQuantity = _detailNames.NamesQuantity;
+            string[] info = new string[uniqueDetailsQuantity + 1];
+            List<string> allDetailsNames = _detailNames.GiveAllNames();
+
+            info[0] = $"Ваш капитал = {_money}.";
+            info[1] = "Количество деталей на складе:";
+
+            for (int i = 1; i < uniqueDetailsQuantity + 1; i++)
+            {
+                string detailName = allDetailsNames[i - 1];
+                int detailsQuantity = _storage.Count(detail => detail.Name == detailName);
+
+                info[i] = $"{detailName} {detailsQuantity}";
+            }
+
+            return info;
+        }
+
+        public void TakeCar(Car car) =>
+            _car = car;
+
+        public void TakeDetail(Detail detail) =>
+            _storage.Add(detail);
+
+        public void PayMoney(int price) =>
+            _money -= price;
+
+        public List<string> GiveDetailsForRepair() =>
+            _car.GiveDetailsForRepair();
+
+        public void ReplaceDetail(string detailName)
+        {
+            Detail detail = _storage.FirstOrDefault(detailToFind => detailToFind.Name == detailName);
+
+            if (detail == null)
+            {
+                Renderer.DrawText($"{detailName} нет на складе.");
+
+                return;
+            }
+
+            if (_car.GiveDetailsForRepair().FirstOrDefault(detailsName => detail.Name == detailsName) == null)
+            {
+                Renderer.DrawText("Вы заменили не ту деталь и вас оштрафовали.");
+
+                _money -= _moneyForFailure;
+
+                if (_money < 0)
+                    _money = 0;
+
+                return;
+            }
+
+            _car.InstallDetail(detail);
+            _storage.Remove(detail);
+
+            Renderer.DrawText($"Вы заменили {detailName}.");
+
+            _money += _moneyForRepair;
+        }
+    }
+
+    class DetailFabrik
+    {
+        private DetailNames _detailNames;
+
+        public DetailFabrik(DetailNames detailNames) =>
+            _detailNames = detailNames;
+
+        public int Price => 1000;
+
+        public Engine CreateEngine() =>
+            new Engine(_detailNames.Engine);
+
+        public BrakeSystem CreateBrakeSystem() =>
+            new BrakeSystem(_detailNames.BrakeSystem);
+
+        public Pendant CreatePendant() =>
+            new Pendant(_detailNames.Pendant);
+    }
+
+    class DetailNames
+    {
+        public DetailNames() =>
+            NamesQuantity = 3;
+
+        public int NamesQuantity { get; private set; }
+
+        public string Engine => "Двигатель";
+        public string BrakeSystem => "Тормозная система";
+        public string Pendant => "Подвеска";
+
+        public List<string> GiveAllNames() =>
+            new List<string> { Engine, BrakeSystem, Pendant };
+    }
+
+    abstract class Menu
+    {
+        private const ConsoleKey MoveSelectionUp = ConsoleKey.UpArrow;
+        private const ConsoleKey MoveSelectionDown = ConsoleKey.DownArrow;
+        private const ConsoleKey ConfirmSelection = ConsoleKey.Enter;
+
+        protected string[] _items;
+        protected int _itemIndex = 0;
+
+        private bool _isRunning;
+
+        public void Work()
+        {
+            _isRunning = true;
+
+            while (_isRunning)
+            {
+                Renderer.DrawMenu(_items, _itemIndex);
+
+                ReadKey();
+            }
+        }
+
+        protected virtual void ConfirmActionSelection()
+        {
+            Renderer.EraseColumnText(_items.Length);
+            Renderer.EraseText();
+        }
+
+        protected void Exit() =>
+            _isRunning = false;
+
+        private void SetItemIndex(int index)
+        {
+            int lastIndex = _items.Length - 1;
+
+            if (index > lastIndex)
+                index = lastIndex;
+
+            if (index < 0)
+                index = 0;
+
+            _itemIndex = index;
+        }
+
+        private void ReadKey()
+        {
+            switch (Console.ReadKey(true).Key)
+            {
+                case MoveSelectionDown:
+                    SetItemIndex(_itemIndex + 1);
+                    break;
+
+                case MoveSelectionUp:
+                    SetItemIndex(_itemIndex - 1);
+                    break;
+
+                case ConfirmSelection:
+                    ConfirmActionSelection();
+                    break;
+            }
+        }
+    }
+
+    class MainMenu : Menu
+    {
+        private Dictionary<string, Action> _actions;
+
+        public MainMenu(Dictionary<string, Action> actions)
+        {
+            _actions = actions;
+            _actions.Add("Выход", Exit);
+            _items = _actions.Keys.ToArray();
+        }
+
+        protected override void ConfirmActionSelection()
+        {
+            base.ConfirmActionSelection();
+
+            _actions[_items[_itemIndex]].Invoke();
+        }
+    }
+
+    class BuyMenu : Menu
+    {
+        private Dictionary<string, Func<Detail>> _actions;
+        private Action<Func<Detail>> _action;
+
+        public BuyMenu(Dictionary<string, Func<Detail>> actions, Action<Func<Detail>> action)
+        {
+            _actions = actions;
+            _actions.Add("Закончить покупки", Exit);
+            _items = _actions.Keys.ToArray();
+            _action = action;
+        }
+
+        protected override void ConfirmActionSelection()
+        {
+            base.ConfirmActionSelection();
+
+            _action(_actions[_items[_itemIndex]]);
+        }
+
+        private new Detail Exit()
+        {
+            base.Exit();
+
+            return null;
+        }
+    }
+
+    class RepairMenu : Menu
+    {
+        private string _exitWord = "Закончить ремонт";
+        private Action<string> _action;
+        private Action _updateInfo;
+        private Dictionary<string, string> _repairOptions;
+
+        public RepairMenu(Dictionary<string, string> repairOptions, Action<string> action, Action updateInfo)
+        {
+            _action = action;
+            _repairOptions = repairOptions;
+            _updateInfo = updateInfo;
+
+            _repairOptions.Add(_exitWord, null);
+            _items = _repairOptions.Keys.ToArray();
+
+            _updateInfo.Invoke();
+        }
+
+        protected override void ConfirmActionSelection()
+        {
+            base.ConfirmActionSelection();
+
+            if (_items[_itemIndex] == _exitWord)
+            {
+                Exit();
+
+                return;
+            }
+
+            string detailName = _repairOptions[_items[_itemIndex]];
+
+            _action(detailName);
+
+            _updateInfo.Invoke();
+        }
+    }
+
+    static class RandomUtility
+    {
+        private static Random s_random = new Random();
+
+        public static int Next(int maxValue) =>
+            s_random.Next(maxValue);
+
+        public static int Next(int minValue, int maxValue) =>
+            s_random.Next(minValue, maxValue);
+    }
+
+    static class Renderer
+    {
+        public const int DetailsForRepairCursorPositionY = 7;
+        private const int TextCursorPositionY = 5;
+        private const int StorageCursorPositionY = 11;
+
+        private const ConsoleColor s_backgroundColor = ConsoleColor.White;
+        private const ConsoleColor s_foregroundColor = ConsoleColor.Black;
+
+        private const int SpaceLineSize = 100;
+        private const char SpaceChar = ' ';
+
+        public static void DrawStorage(string[] storageInfo)
+        {
+            for (int i = 0; i < storageInfo.Length; i++)
+                DrawText(storageInfo[i], StorageCursorPositionY + i);
+        }
+
+        public static void DrawRepairInfo(List<string> detailsName)
+        {
+            Console.SetCursorPosition(0, DetailsForRepairCursorPositionY);
+
+            Console.WriteLine("Необходимо отремонтировать:");
+
+            detailsName.ForEach(name => Console.WriteLine(name));
+        }
+
+        public static void DrawMenu(string[] items, int index)
+        {
+            Console.SetCursorPosition(0, 0);
+
+            for (int i = 0; i < items.Length; i++)
+                if (i == index)
+                    WriteColoredText(items[i]);
+                else
+                    Console.WriteLine(items[i]);
+        }
+
+        public static void EraseColumnText(int value, int cursorPositionY = 0)
+        {
+            Console.SetCursorPosition(0, cursorPositionY);
+
+            for (int i = 0; i < value; i++)
+                EraseText(cursorPositionY + i);
+        }
+
+        public static void DrawText(string text, int cursorPositionY = TextCursorPositionY)
+        {
+            EraseText(cursorPositionY);
+
+            Console.Write(text);
+        }
+
+        public static void EraseText(int cursorPositionY = TextCursorPositionY)
+        {
+            Console.SetCursorPosition(0, cursorPositionY);
+            Console.Write(new string(SpaceChar, SpaceLineSize));
+            Console.CursorLeft = 0;
+        }
+
+        public static void WriteColoredText(string text, ConsoleColor frontColor = s_foregroundColor, ConsoleColor backColor = s_backgroundColor)
+        {
+            Console.ForegroundColor = frontColor;
+            Console.BackgroundColor = backColor;
+
+            Console.WriteLine(text);
+            Console.ResetColor();
+        }
     }
 }
