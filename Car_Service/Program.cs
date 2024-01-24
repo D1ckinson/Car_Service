@@ -12,8 +12,9 @@ namespace Car_Service
             Console.CursorVisible = false;
 
             DetailNames detailNames = new DetailNames();
-            CarService carService = new CarService(detailNames);
-            ActionBuilder actionBuilder = new ActionBuilder(carService);
+            DetailFabrik detailFabrik = new DetailFabrik();
+            CarService carService = new CarService(detailNames.GiveAllNames());
+            ActionBuilder actionBuilder = new ActionBuilder(carService, detailFabrik);
             Menu menu = new MainMenu(actionBuilder.MainMenuActions);
 
             Renderer.DrawStorage(carService.GetStorageInfo());
@@ -55,12 +56,16 @@ namespace Car_Service
     class ActionBuilder
     {
         private CarService _carService;
-        private DetailFabrik _detailFabrik = new DetailFabrik(new DetailNames());
-        private CarFabrik _carFabrik = new CarFabrik();
+        private DetailFabrik _detailFabrik;
+        private CarFabrik _carFabrik;
         private DetailNames _detailNames = new DetailNames();
 
-        public ActionBuilder(CarService carService) =>
+        public ActionBuilder(CarService carService, DetailFabrik detailFabrik)
+        {
             _carService = carService;
+            _detailFabrik = detailFabrik;
+            _carFabrik = new CarFabrik(detailFabrik.AllDetails);
+        }
 
         public Dictionary<string, Action> MainMenuActions =>
             new Dictionary<string, Action>
@@ -163,24 +168,25 @@ namespace Car_Service
 
     class CarFabrik
     {
-        private DetailFabrik _detailFabrik = new DetailFabrik(new DetailNames());
+        public CarFabrik(List<Detail> details) =>
+            CarDetails = details;
 
-        public List<Detail> CarDetails => new List<Detail> { _detailFabrik.CreatePendant(), _detailFabrik.CreateEngine(), _detailFabrik.CreateBrakeSystem() };
+        public List<Detail> CarDetails { get; private set; }
 
         public Car CreateCar()
         {
-            List<Detail> CarDetails = this.CarDetails;
+            List<Detail> carDetails = this.CarDetails;
 
-            BreakCarDetails(CarDetails);
+            BreakCarDetails(carDetails);
 
-            return new Car(CarDetails);
+            return new Car(carDetails);
         }
 
         private void BreakCarDetails(List<Detail> details)
         {
             int breakQuantity = RandomUtility.Next(details.Count);
 
-            if (breakQuantity == 0)
+            if (breakQuantity > 0)
             {
                 int detailIndex = RandomUtility.Next(details.Count);
 
@@ -216,34 +222,28 @@ namespace Car_Service
         private int _moneyForRepair = 1500;
         private int _moneyForFailure = 2000;
         private Car _car;
-        private DetailNames _detailNames;
+        private List<string> _detailNames;
 
-        public CarService(DetailNames detailNames)
-        {
+        public CarService(List<string> detailNames) =>
             _detailNames = detailNames;
-            _storage.Add(new BrakeSystem(_detailNames.BrakeSystem));
-            _storage.Add(new Engine(_detailNames.Engine));
-            _storage.Add(new Pendant(_detailNames.Pendant));
-        }
 
         public bool IsMoneyEnough(int price) =>
             _money > price;
 
         public string[] GetStorageInfo()
         {
-            int uniqueDetailsQuantity = _detailNames.NamesQuantity;
+            int uniqueDetailsQuantity = _detailNames.Count;
             string[] info = new string[uniqueDetailsQuantity + 1];
-            List<string> allDetailsNames = _detailNames.GiveAllNames();
 
-            info[0] = $"Ваш капитал = {_money}.";
+            info[0] = $"Ваш капитал = {_money}";
             info[1] = "Количество деталей на складе:";
 
             for (int i = 1; i < uniqueDetailsQuantity + 1; i++)
             {
-                string detailName = allDetailsNames[i - 1];
+                string detailName = _detailNames[i - 1];
                 int detailsQuantity = _storage.Count(detail => detail.Name == detailName);
 
-                info[i] = $"{detailName} {detailsQuantity}";
+                info[i] = $"{detailName}: {detailsQuantity}";
             }
 
             return info;
@@ -295,21 +295,29 @@ namespace Car_Service
 
     class DetailFabrik
     {
-        private DetailNames _detailNames;
+        public DetailFabrik() =>
+            NamesQuantity = GiveAllNames().Count();
 
-        public DetailFabrik(DetailNames detailNames) =>
-            _detailNames = detailNames;
+        public string EngineName => "Двигатель";
+        public string BrakeSystemName => "Тормозная система";
+        public string PendantName => "Подвеска";
+        public List<Detail> AllDetails =>
+            new List<Detail> { CreatePendant(), CreateEngine(), CreateBrakeSystem() };
 
         public int Price => 1000;
+        public int NamesQuantity { get; private set; }
+
+        public List<string> GiveAllNames() =>
+            new List<string> { EngineName, BrakeSystemName, PendantName };
 
         public Engine CreateEngine() =>
-            new Engine(_detailNames.Engine);
+            new Engine(EngineName);
 
         public BrakeSystem CreateBrakeSystem() =>
-            new BrakeSystem(_detailNames.BrakeSystem);
+            new BrakeSystem(BrakeSystemName);
 
         public Pendant CreatePendant() =>
-            new Pendant(_detailNames.Pendant);
+            new Pendant(PendantName);
     }
 
     class DetailNames
@@ -491,10 +499,10 @@ namespace Car_Service
     {
         public const int DetailsForRepairCursorPositionY = 7;
         private const int TextCursorPositionY = 5;
-        private const int StorageCursorPositionY = 11;
+        private const int StorageCursorPositionY = 12;
 
-        private const ConsoleColor s_backgroundColor = ConsoleColor.White;
-        private const ConsoleColor s_foregroundColor = ConsoleColor.Black;
+        private const ConsoleColor BackgroundColor = ConsoleColor.White;
+        private const ConsoleColor ForegroundColor = ConsoleColor.Black;
 
         private const int SpaceLineSize = 100;
         private const char SpaceChar = ' ';
@@ -547,7 +555,7 @@ namespace Car_Service
             Console.CursorLeft = 0;
         }
 
-        public static void WriteColoredText(string text, ConsoleColor frontColor = s_foregroundColor, ConsoleColor backColor = s_backgroundColor)
+        public static void WriteColoredText(string text, ConsoleColor frontColor = ForegroundColor, ConsoleColor backColor = BackgroundColor)
         {
             Console.ForegroundColor = frontColor;
             Console.BackgroundColor = backColor;
