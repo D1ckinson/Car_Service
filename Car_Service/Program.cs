@@ -11,13 +11,13 @@ namespace Car_Service
         {
             Console.CursorVisible = false;
 
-            DetailNames detailNames = new DetailNames();
+            Renderer renderer = new Renderer();
             DetailFabrik detailFabrik = new DetailFabrik();
-            CarService carService = new CarService(detailNames.GiveAllNames());
-            ActionBuilder actionBuilder = new ActionBuilder(carService, detailFabrik);
+            CarService carService = new CarService(detailFabrik.GiveAllNames(), renderer);
+            ActionBuilder actionBuilder = new ActionBuilder(carService, detailFabrik, renderer);
             Menu menu = new MainMenu(actionBuilder.MainMenuActions);
 
-            Renderer.DrawStorage(carService.GetStorageInfo());
+            renderer.DrawStorage(carService.GetStorageInfo());
 
             menu.Work();
         }
@@ -34,7 +34,7 @@ namespace Car_Service
         public bool IsWorking { get; protected set; }
         public string Name { get; protected set; }
 
-        public void SetIsWorkingFalse() =>
+        public void Break() =>
             IsWorking = false;
     }
 
@@ -58,10 +58,11 @@ namespace Car_Service
         private CarService _carService;
         private DetailFabrik _detailFabrik;
         private CarFabrik _carFabrik;
-        private DetailNames _detailNames = new DetailNames();
+        private Renderer _renderer;
 
-        public ActionBuilder(CarService carService, DetailFabrik detailFabrik)
+        public ActionBuilder(CarService carService, DetailFabrik detailFabrik, Renderer renderer)
         {
+            _renderer = renderer;
             _carService = carService;
             _detailFabrik = detailFabrik;
             _carFabrik = new CarFabrik(detailFabrik.AllDetails);
@@ -77,9 +78,9 @@ namespace Car_Service
         private Dictionary<string, Func<Detail>> BuyMenuActions =>
             new Dictionary<string, Func<Detail>>
             {
-                {$"Купить {_detailNames.Engine}", _detailFabrik.CreateEngine},
-                {$"Купить {_detailNames.Pendant}", _detailFabrik.CreatePendant},
-                {$"Купить {_detailNames.BrakeSystem}", _detailFabrik.CreateBrakeSystem},
+                {$"Купить {_detailFabrik.EngineName}", _detailFabrik.CreateEngine},
+                {$"Купить {_detailFabrik.PendantName}", _detailFabrik.CreatePendant},
+                {$"Купить {_detailFabrik.BrakeSystemName}", _detailFabrik.CreateBrakeSystem},
             };
 
         private void RepairCar()
@@ -90,14 +91,14 @@ namespace Car_Service
 
             repairMenu.Work();
 
-            Renderer.EraseColumnText(_detailNames.NamesQuantity + 1, Renderer.DetailsForRepairCursorPositionY);
+            _renderer.EraseColumnText(_detailFabrik.NamesQuantity + 1);
         }
 
         private void UpdateRepairInfo()
         {
-            Renderer.EraseColumnText(_detailNames.NamesQuantity + 1, Renderer.DetailsForRepairCursorPositionY);
-            Renderer.DrawRepairInfo(_carService.GiveDetailsForRepair());
-            Renderer.DrawStorage(_carService.GetStorageInfo());
+            _renderer.EraseColumnText(_detailFabrik.NamesQuantity + 1);
+            _renderer.DrawRepairInfo(_carService.GiveDetailsForRepair());
+            _renderer.DrawStorage(_carService.GetStorageInfo());
         }
 
         private void BuyDetails()
@@ -119,12 +120,12 @@ namespace Car_Service
                 _carService.TakeDetail(detail);
                 _carService.PayMoney(_detailFabrik.Price);
 
-                Renderer.DrawText($"Вы купили {detail.Name}.");
-                Renderer.DrawStorage(_carService.GetStorageInfo());
+                _renderer.DrawText($"Вы купили {detail.Name}.");
+                _renderer.DrawStorage(_carService.GetStorageInfo());
             }
             else
             {
-                Renderer.DrawText("У вас недостаточно денег.");
+                _renderer.DrawText("У вас недостаточно денег.");
             }
         }
 
@@ -168,10 +169,13 @@ namespace Car_Service
 
     class CarFabrik
     {
-        public CarFabrik(List<Detail> details) =>
-            CarDetails = details;
+        private List<Detail> _carDetails;
 
-        public List<Detail> CarDetails { get; private set; }
+        public CarFabrik(List<Detail> details) =>
+            _carDetails = details;
+
+        public List<Detail> CarDetails =>
+            new List<Detail>(_carDetails);
 
         public Car CreateCar()
         {
@@ -190,7 +194,7 @@ namespace Car_Service
             {
                 int detailIndex = RandomUtility.Next(details.Count);
 
-                details[detailIndex].SetIsWorkingFalse();
+                details[detailIndex].Break();
 
                 return;
             }
@@ -208,7 +212,7 @@ namespace Car_Service
 
                 Detail detail = tempDetails[detailIndex];
 
-                detail.SetIsWorkingFalse();
+                detail.Break();
 
                 tempDetails.Remove(detail);
             }
@@ -223,9 +227,13 @@ namespace Car_Service
         private int _moneyForFailure = 2000;
         private Car _car;
         private List<string> _detailNames;
+        private Renderer _renderer;
 
-        public CarService(List<string> detailNames) =>
+        public CarService(List<string> detailNames, Renderer renderer)
+        {
+            _renderer = renderer;
             _detailNames = detailNames;
+        }
 
         public bool IsMoneyEnough(int price) =>
             _money > price;
@@ -267,14 +275,14 @@ namespace Car_Service
 
             if (detail == null)
             {
-                Renderer.DrawText($"{detailName} нет на складе.");
+                _renderer.DrawText($"{detailName} нет на складе.");
 
                 return;
             }
 
             if (_car.GiveDetailsForRepair().FirstOrDefault(detailsName => detail.Name == detailsName) == null)
             {
-                Renderer.DrawText("Вы заменили не ту деталь и вас оштрафовали.");
+                _renderer.DrawText("Вы заменили не ту деталь и вас оштрафовали.");
 
                 _money -= _moneyForFailure;
 
@@ -287,7 +295,7 @@ namespace Car_Service
             _car.InstallDetail(detail);
             _storage.Remove(detail);
 
-            Renderer.DrawText($"Вы заменили {detailName}.");
+            _renderer.DrawText($"Вы заменили {detailName}.");
 
             _money += _moneyForRepair;
         }
@@ -320,21 +328,6 @@ namespace Car_Service
             new Pendant(PendantName);
     }
 
-    class DetailNames
-    {
-        public DetailNames() =>
-            NamesQuantity = 3;
-
-        public int NamesQuantity { get; private set; }
-
-        public string Engine => "Двигатель";
-        public string BrakeSystem => "Тормозная система";
-        public string Pendant => "Подвеска";
-
-        public List<string> GiveAllNames() =>
-            new List<string> { Engine, BrakeSystem, Pendant };
-    }
-
     abstract class Menu
     {
         private const ConsoleKey MoveSelectionUp = ConsoleKey.UpArrow;
@@ -344,6 +337,7 @@ namespace Car_Service
         protected string[] _items;
         protected int _itemIndex = 0;
 
+        private Renderer _renderer = new Renderer();
         private bool _isRunning;
 
         public void Work()
@@ -352,7 +346,7 @@ namespace Car_Service
 
             while (_isRunning)
             {
-                Renderer.DrawMenu(_items, _itemIndex);
+                _renderer.DrawMenu(_items, _itemIndex);
 
                 ReadKey();
             }
@@ -360,8 +354,8 @@ namespace Car_Service
 
         protected virtual void ConfirmActionSelection()
         {
-            Renderer.EraseColumnText(_items.Length);
-            Renderer.EraseText();
+            _renderer.EraseColumnText(_items.Length, true);
+            _renderer.EraseText();
         }
 
         protected void Exit() =>
@@ -484,45 +478,34 @@ namespace Car_Service
         }
     }
 
-    static class RandomUtility
+    class Renderer
     {
-        private static Random s_random = new Random();
+        private readonly int detailsForRepairCursorPositionY = 7;
+        private int textCursorPositionY = 5;
+        private int _storageCursorPositionY = 12;
 
-        public static int Next(int maxValue) =>
-            s_random.Next(maxValue);
+        private ConsoleColor _backgroundColor = ConsoleColor.White;
+        private ConsoleColor _foregroundColor = ConsoleColor.Black;
 
-        public static int Next(int minValue, int maxValue) =>
-            s_random.Next(minValue, maxValue);
-    }
+        private int _spaceLineSize = 100;
+        private char _spaceChar = ' ';
 
-    static class Renderer
-    {
-        public const int DetailsForRepairCursorPositionY = 7;
-        private const int TextCursorPositionY = 5;
-        private const int StorageCursorPositionY = 12;
-
-        private const ConsoleColor BackgroundColor = ConsoleColor.White;
-        private const ConsoleColor ForegroundColor = ConsoleColor.Black;
-
-        private const int SpaceLineSize = 100;
-        private const char SpaceChar = ' ';
-
-        public static void DrawStorage(string[] storageInfo)
+        public void DrawStorage(string[] storageInfo)
         {
             for (int i = 0; i < storageInfo.Length; i++)
-                DrawText(storageInfo[i], StorageCursorPositionY + i);
+                DrawText(storageInfo[i], _storageCursorPositionY + i);
         }
 
-        public static void DrawRepairInfo(List<string> detailsName)
+        public void DrawRepairInfo(List<string> detailsName)
         {
-            Console.SetCursorPosition(0, DetailsForRepairCursorPositionY);
+            Console.SetCursorPosition(0, detailsForRepairCursorPositionY);
 
             Console.WriteLine("Необходимо отремонтировать:");
 
             detailsName.ForEach(name => Console.WriteLine(name));
         }
 
-        public static void DrawMenu(string[] items, int index)
+        public void DrawMenu(string[] items, int index)
         {
             Console.SetCursorPosition(0, 0);
 
@@ -533,35 +516,63 @@ namespace Car_Service
                     Console.WriteLine(items[i]);
         }
 
-        public static void EraseColumnText(int value, int cursorPositionY = 0)
+        public void EraseColumnText(int value, bool isMenu = false)
         {
+            int cursorPositionY = isMenu ? 0 : detailsForRepairCursorPositionY;
+
             Console.SetCursorPosition(0, cursorPositionY);
 
             for (int i = 0; i < value; i++)
                 EraseText(cursorPositionY + i);
         }
 
-        public static void DrawText(string text, int cursorPositionY = TextCursorPositionY)
+        public void DrawText(string text)
         {
-            EraseText(cursorPositionY);
+            EraseText(textCursorPositionY);
 
             Console.Write(text);
         }
 
-        public static void EraseText(int cursorPositionY = TextCursorPositionY)
+        public void DrawText(string text, int cursorPosition)
+        {
+            EraseText(cursorPosition);
+
+            Console.Write(text);
+        }
+
+        public void EraseText(int cursorPositionY)
         {
             Console.SetCursorPosition(0, cursorPositionY);
-            Console.Write(new string(SpaceChar, SpaceLineSize));
+            Console.Write(new string(_spaceChar, _spaceLineSize));
             Console.CursorLeft = 0;
         }
 
-        public static void WriteColoredText(string text, ConsoleColor frontColor = ForegroundColor, ConsoleColor backColor = BackgroundColor)
+        public void EraseText()
         {
-            Console.ForegroundColor = frontColor;
-            Console.BackgroundColor = backColor;
+            Console.SetCursorPosition(0, textCursorPositionY);
+            Console.Write(new string(_spaceChar, _spaceLineSize));
+            Console.CursorLeft = 0;
+        }
+
+
+        public void WriteColoredText(string text)
+        {
+            Console.ForegroundColor = _foregroundColor;
+            Console.BackgroundColor = _backgroundColor;
 
             Console.WriteLine(text);
             Console.ResetColor();
         }
+    }
+
+    static class RandomUtility
+    {
+        private static Random s_random = new Random();
+
+        public static int Next(int maxValue) =>
+            s_random.Next(maxValue);
+
+        public static int Next(int minValue, int maxValue) =>
+            s_random.Next(minValue, maxValue);
     }
 }
